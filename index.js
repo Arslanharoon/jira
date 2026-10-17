@@ -141,15 +141,15 @@ app.get('/', async (req, res) => {
     if (!date) {
         date = new Date().toISOString().split('T')[0];
     }
-    res.write(`<b>Work Report (${date})</b><br /><br />`)
+    res.write(`<h3>*Work Report (${date})*</h3><br /><br />`)
 
     for (const user of USER_ACCOUNT_IDS) {
         let ud = await getWorklogsForUser(user, date);
         if( Object.keys(ud).length === 0) continue;
 
-        res.write(`<b>👨${ user.name }</b><br />`)
+        res.write(`<b>*👨${ user.name }*</b><br />`)
         for (const [project, tasks] of Object.entries(ud)){
-            res.write(`<b>📁${ project }</b><br />`)
+            res.write(`<b>*📁${ project }*</b><br />`)
             for( const [key, task] of Object.entries(tasks) ){
                 res.write(`${ task.title } (${task.type} | ${ task.status })<br />`)
                 for (const comment of task.comments){
