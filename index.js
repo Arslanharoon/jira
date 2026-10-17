@@ -79,7 +79,7 @@ async function getWorklogsForUser(user, date) {
             const started = new Date(wl.started);
             if( date !== started.toISOString().split('T')[0].toString() ) return;
 
-            let p = issue.fields.project.name;
+            let p = issue.fields.project.name.trim();
             let key = issue.fields.issuetype.key;
             let title =  (issue.fields.summary || "").replace(/,/g, " ")
 
@@ -141,26 +141,26 @@ app.get('/', async (req, res) => {
     if (!date) {
         date = new Date().toISOString().split('T')[0];
     }
-    res.write(`<h3>*Work Report (${date})*</h3><br /><br />`)
+    res.write(`<h3>*Work Report (${date})*</h3><br />`)
 
     for (const user of USER_ACCOUNT_IDS) {
         let ud = await getWorklogsForUser(user, date);
         if( Object.keys(ud).length === 0) continue;
 
-        res.write(`<b>*👨${ user.name }*</b><br />`)
+        res.write(`<div><b>*👨${ user.name.trim() }*</b></div>`)
         for (const [project, tasks] of Object.entries(ud)){
-            res.write(`<b>*📁${ project }*</b><br />`)
+            res.write(`<div><b>*📁${ project }*</b></div>`)
             for( const [key, task] of Object.entries(tasks) ){
                 res.write(`${ task.title } (${task.type} | ${ task.status })<br />`)
                 for (const comment of task.comments){
                     if(comment.length > 0){
-                        res.write(`${ task.comment }<br />`)
+                        res.write(`<div>${ task.comment }</div><br />`)
                     }
                 }
             }
             res.write(`<br />`)
         }
-        res.write(`<br /><br />`)
+        res.write(`<br />`)
     }
 
     res.end()
