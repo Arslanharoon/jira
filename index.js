@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require("axios");
-const { Parser } = require('@json2csv/plainjs');
 const app = express()
 const { SERVER_PORT, JIRA_URL, JIRA_EMAIL, JIRA_TOKEN } = process.env;
 
@@ -52,7 +51,7 @@ function extractTextFromADF(node) {
         const childTexts = node.content.map(extractTextFromADF);
 
         if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'bulletList' || node.type === 'orderedList') {
-            return childTexts.join('') + '\n';
+            return childTexts.join(', ');
         }
         if (node.type === 'listItem') {
             return '• ' + childTexts.join('');
@@ -62,9 +61,8 @@ function extractTextFromADF(node) {
     return '';
 }
 
-async function getWorklogsForUser(user, start, end) {
-    const jql = `worklogAuthor=${user.id} AND worklogDate >= "${start}" AND worklogDate <= "${end}"`;
-
+async function getWorklogsForUser(user, date) {
+    const jql = `worklogAuthor=${user.id} AND worklogDate >= "${date}" AND worklogDate <= "${date}"`;
     const response = await jira.get("/search/jql", {
         params: {
             jql,
@@ -72,36 +70,46 @@ async function getWorklogsForUser(user, start, end) {
             maxResults: 100
         }
     });
-
-    let rows = [];
+    let projectWise = {};
     for (const issue of response.data.issues) {
         const worklogs = await getAllWorklogs(issue.key);
-
         //if (!issue.fields.worklog) return;
-
         worklogs.forEach(wl => {
             if (wl.author.accountId !== user.id) return;
             const started = new Date(wl.started);
-            const date = started.toLocaleString("en-CA", {
-                timeZone: "Asia/Karachi"
-            }).split(",")[0];
+            if( date !== started.toISOString().split('T')[0].toString() ) return;
 
-            const hours = wl.timeSpentSeconds / 3600;
+            let p = issue.fields.project.name;
+            let key = issue.fields.issuetype.key;
+            let title =  (issue.fields.summary || "").replace(/,/g, " ")
 
-            rows.push({
-                'Author': user.name || 'N/A',
-                'Project Key': issue.fields.project.key,
-                //'Date': date,
-                //'Hours': hours.toFixed(2),
-                //'Issue Key': issue.key,
-                'Title': (issue.fields.summary || "").replace(/,/g, " "),
-                'Comment': extractTextFromADF(wl.comment)
-                //'Type': issue.fields.issuetype.name,
-                //'Status': issue.fields.status.name,
-            });
+            if( projectWise[ p ] === undefined ){
+                projectWise[ p ] = {
+                    [key]: {
+                        title: title,
+                        type: issue.fields.issuetype.name,
+                        status: issue.fields.status.name,
+                        comments: [
+                            extractTextFromADF(wl.comment).replaceAll("\n", ', ')
+                        ]
+
+                    }
+                };
+            }else if( projectWise[ p ][key] === undefined ){
+                projectWise[ p ][key] = {
+                    title: title,
+                    type: issue.fields.issuetype.name,
+                    status: issue.fields.status.name,
+                    comments: [
+                        extractTextFromADF(wl.comment).replaceAll("\n", ', ')
+                    ]
+                }
+            }else{
+                projectWise[p][key].comments.push( extractTextFromADF(wl.comment).replaceAll("\n", ', ') )
+            }
         });
     };
-    return rows;
+    return projectWise;
 }
 
 async function getAllWorklogs(issueKey) {
@@ -126,35 +134,35 @@ async function getAllWorklogs(issueKey) {
 
 
 app.get('/', async (req, res) => {
-    let {start, end} = req.query;
-    if(!start) start = new Date().toISOString().split('T')[0].toString()
-    if (!end) end = start;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
 
-    const opts = { fields: [
-        'Author',
-        'Project Key',
-        //'Issue Key',
-        'Title',
-        'Comment'
-        //'Type',
-        //'Date',
-        //'Hours',
-        //'Status'
-    ] };
-    const parser = new Parser(opts);
+    let { date } = req.query;
 
-    let jsonData = [];
+    if (!date) {
+        date = new Date().toISOString().split('T')[0];
+    }
+    res.write(`<b>Work Report (${date})</b><br /><br />`)
+
     for (const user of USER_ACCOUNT_IDS) {
-        let ud = await getWorklogsForUser(user, start, end);
-        jsonData = [...jsonData, ...ud];
+        let ud = await getWorklogsForUser(user, date);
+        if( Object.keys(ud).length === 0) continue;
+
+        res.write(`<b>👨${ user.name }</b><br />`)
+        for (const [project, tasks] of Object.entries(ud)){
+            res.write(`<b>📁${ project }</b><br />`)
+            for( const [key, task] of Object.entries(tasks) ){
+                res.write(`${ task.title } (${task.type} | ${ task.status })<br />`)
+                for (const comment of task.comments){
+                    if(comment.length > 0){
+                        res.write(`${ task.comment }<br />`)
+                    }
+                }
+            }
+            res.write(`<br />`)
+        }
+        res.write(`<br /><br />`)
     }
 
-    const csv = parser.parse(jsonData);
-    res.header('Content-Type', 'text/csv');
-    res.attachment('report.csv');
-
-    return res.send(csv);
-
-    //res.send(SERVER_PORT + ' ' + JIRA_URL + ' ' + JIRA_EMAIL + ' ' + JIRA_TOKEN)
+    res.end()
 })
 app.listen(SERVER_PORT);
