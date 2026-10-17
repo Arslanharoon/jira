@@ -41,6 +41,27 @@ const jira = axios.create({
     },
 });
 
+function extractTextFromADF(node) {
+    if (!node) return '';
+
+    if (node.type === 'text' && node.text) {
+        return node.text;
+    }
+
+    if (Array.isArray(node.content)) {
+        const childTexts = node.content.map(extractTextFromADF);
+
+        if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'bulletList' || node.type === 'orderedList') {
+            return childTexts.join('') + '\n';
+        }
+        if (node.type === 'listItem') {
+            return '• ' + childTexts.join('');
+        }
+        return childTexts.join('');
+    }
+    return '';
+}
+
 async function getWorklogsForUser(user, start, end) {
     const jql = `worklogAuthor=${user.id} AND worklogDate >= "${start}" AND worklogDate <= "${end}"`;
 
@@ -68,14 +89,15 @@ async function getWorklogsForUser(user, start, end) {
             const hours = wl.timeSpentSeconds / 3600;
 
             rows.push({
+                'Author': user.name || 'N/A',
                 'Project Key': issue.fields.project.key,
-                'Issue Key': issue.key,
+                //'Date': date,
+                //'Hours': hours.toFixed(2),
+                //'Issue Key': issue.key,
                 'Title': (issue.fields.summary || "").replace(/,/g, " "),
-                'Type': issue.fields.issuetype.name,
-                'Author': user.name || 'test',
-                'Date': date,
-                'Hours': hours.toFixed(2),
-                'Status': issue.fields.status.name,
+                'Comment': extractTextFromADF(wl.comment)
+                //'Type': issue.fields.issuetype.name,
+                //'Status': issue.fields.status.name,
             });
         });
     };
@@ -108,7 +130,17 @@ app.get('/', async (req, res) => {
     if(!start) start = new Date().toISOString().split('T')[0].toString()
     if (!end) end = start;
 
-    const opts = { fields: ['Project Key', 'Issue Key', 'Title', 'Type', 'Author', 'Date', 'Hours', 'Status'] };
+    const opts = { fields: [
+        'Author',
+        'Project Key',
+        //'Issue Key',
+        'Title',
+        'Comment'
+        //'Type',
+        //'Date',
+        //'Hours',
+        //'Status'
+    ] };
     const parser = new Parser(opts);
 
     let jsonData = [];
