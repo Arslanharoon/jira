@@ -105,7 +105,9 @@ async function getWorklogsForUser(user, date) {
                     ]
                 }
             }else{
-                projectWise[p][key].comments.push( extractTextFromADF(wl.comment).replaceAll("\n", ', ') )
+                projectWise[p][key].comments.push(
+                    extractTextFromADF(wl.comment).replaceAll("\n", ', ')
+                )
             }
         });
     };
@@ -154,7 +156,7 @@ app.get('/', async (req, res) => {
                 res.write(`${ task.title } (${task.type} | ${ task.status })<br />`)
                 for (const comment of task.comments){
                     if(comment.length > 0){
-                        res.write(`<div>${ task.comment }</div><br />`)
+                        res.write(`<div>${ comment }</div><br />`)
                     }
                 }
             }
