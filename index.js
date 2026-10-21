@@ -9,9 +9,9 @@ const USER_ACCOUNT_IDS = [
     { id: "712020:6af8e173-175c-463f-a78a-160c420b86b2", name: "Ahmad Ali" },
     { id: "712020:0959af9d-9886-4381-afa1-f790fc9ae2d9", name: "Usama Hadi" },
     { id: "712020:144c7f8d-d654-41dd-946d-4f9e8e89198c", name: "Ahsan Ali" },
-    //
+
     { id: "712020:170bab30-a5f3-469a-9c70-3f046c7d0517", name: "Rahat Ali"},
-    //
+
     { id: "712020:219040d3-9523-4d4d-8d30-c74f35487038", name: "Mudassir Rehman" },
     { id: "712020:2087b901-879f-47f8-9b02-d78c1f681bbd", name: "Mustehsan Ali" },
     { id: "712020:d058887b-e7d3-4ba6-a76d-2f2f7d098dd1", name: "Ali Zayan"},
@@ -61,7 +61,7 @@ function extractTextFromADF(node) {
     return '';
 }
 
-async function getWorklogsForUser(user, date) {
+async function getWorklogsForUser(user, date, res) {
     const jql = `worklogAuthor=${user.id} AND worklogDate >= "${date}" AND worklogDate <= "${date}"`;
     const response = await jira.get("/search/jql", {
         params: {
@@ -80,8 +80,14 @@ async function getWorklogsForUser(user, date) {
             if( date !== started.toISOString().split('T')[0].toString() ) return;
 
             let p = issue.fields.project.name.trim();
-            let key = issue.fields.issuetype.key;
+            let key = issue.key;
             let title =  (issue.fields.summary || "").replace(/,/g, " ")
+
+            // res.write(p)
+            // res.write(JSON.stringify(key))
+            // res.write("------------------------<br />")
+            // res.write(JSON.stringify(issue))
+            // res.write("<br />------------------------")
 
             if( projectWise[ p ] === undefined ){
                 projectWise[ p ] = {
@@ -146,13 +152,15 @@ app.get('/', async (req, res) => {
     res.write(`<h3>*Work Report (${date})*</h3><br />`)
 
     for (const user of USER_ACCOUNT_IDS) {
-        let ud = await getWorklogsForUser(user, date);
+        let ud = await getWorklogsForUser(user, date, res);
         if( Object.keys(ud).length === 0) continue;
 
         res.write(`<div><b>*👨${ user.name.trim() }*</b></div>`)
         for (const [project, tasks] of Object.entries(ud)){
+            //res.write(JSON.stringify(Object.entries(tasks)))
             res.write(`<div><b>*📁${ project }*</b></div>`)
             for( const [key, task] of Object.entries(tasks) ){
+                //res.write(task)
                 res.write(`${ task.title } (${task.type} | ${ task.status })<br />`)
                 for (const comment of task.comments){
                     if(comment.length > 0){
@@ -164,7 +172,7 @@ app.get('/', async (req, res) => {
         }
         res.write(`<br />`)
     }
-
+    res.write(`Done`)
     res.end()
 })
 app.listen(SERVER_PORT);
