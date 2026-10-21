@@ -160,6 +160,7 @@ app.get('/', async (req, res) => {
             //res.write(JSON.stringify(Object.entries(tasks)))
             res.write(`<div><b>*📁${ project }*</b></div>`)
             for( const [key, task] of Object.entries(tasks) ){
+                res.write(`https://alfaisal.atlassian.net/browse/${key} <br/>`)
                 res.write(`<a href="https://alfaisal.atlassian.net/browse/${key}">${ task.title }</a> (${task.type} | ${ task.status })<br />`)
                 for (const comment of task.comments){
                     if(comment.length > 0){
