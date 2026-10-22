@@ -51,12 +51,12 @@ function extractTextFromADF(node) {
         const childTexts = node.content.map(extractTextFromADF);
 
         if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'bulletList' || node.type === 'orderedList') {
-            return childTexts.join(', ');
+            return childTexts.join('<br />');
         }
         if (node.type === 'listItem') {
-            return '• ' + childTexts.join('');
+            return '• ' + childTexts.join('<br />');
         }
-        return childTexts.join('');
+        return childTexts.join('<br />');
     }
     return '';
 }
@@ -83,18 +83,13 @@ async function getWorklogsForUser(user, date, res) {
             let key = issue.key;
             let title =  (issue.fields.summary || "").replace(/,/g, " ")
 
-            // res.write(p)
-            // res.write(JSON.stringify(key))
-            // res.write("------------------------<br />")
-            // res.write(JSON.stringify(issue))
-            // res.write("<br />------------------------")
-
             if( projectWise[ p ] === undefined ){
                 projectWise[ p ] = {
                     [key]: {
                         title: title,
                         type: issue.fields.issuetype.name,
                         status: issue.fields.status.name,
+                        description: extractTextFromADF(issue.fields.description), //issue.fields.description,
                         comments: [
                             extractTextFromADF(wl.comment).replaceAll("\n", ', ')
                         ]
@@ -106,6 +101,7 @@ async function getWorklogsForUser(user, date, res) {
                     title: title,
                     type: issue.fields.issuetype.name,
                     status: issue.fields.status.name,
+                    description: extractTextFromADF(issue.fields.description),
                     comments: [
                         extractTextFromADF(wl.comment).replaceAll("\n", ', ')
                     ]
@@ -116,6 +112,7 @@ async function getWorklogsForUser(user, date, res) {
                 )
             }
         });
+        //break;
     };
     return projectWise;
 }
@@ -160,8 +157,10 @@ app.get('/', async (req, res) => {
             //res.write(JSON.stringify(Object.entries(tasks)))
             res.write(`<div><b>*📁${ project }*</b></div>`)
             for( const [key, task] of Object.entries(tasks) ){
-                res.write(`https://alfaisal.atlassian.net/browse/${key} <br/>`)
+                res.write(`https://alfaisal.atlassian.net/browse/${key}<br/>`)
                 res.write(`<a href="https://alfaisal.atlassian.net/browse/${key}">${ task.title }</a> (${task.type} | ${ task.status })<br />`)
+                res.write(task.description + '<br />')
+
                 for (const comment of task.comments){
                     if(comment.length > 0){
                         res.write(`<div>${ comment }</div><br />`)
